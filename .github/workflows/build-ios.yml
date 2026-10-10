@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -36,7 +36,7 @@ jobs:
 
       - name: Cache Homebrew
         id: cache-brew
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/Library/Caches/Homebrew
           key: brew-ios-${{ runner.os }}-${{ hashFiles('.github/workflows/build-ios.yml') }}
@@ -55,7 +55,7 @@ jobs:
 
       - name: Cache Vulkan SDK
         id: cache-vulkan-sdk
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/VulkanSDK
           key: vulkan-sdk-macos-1.4.341.1
@@ -120,7 +120,7 @@ jobs:
           ls -lh build/GeneralsXZH-unsigned.ipa
 
       - name: Upload Shell IPA Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: GeneralsXZH-Shell-unsigned
           path: build/GeneralsXZH-unsigned.ipa
@@ -137,29 +137,31 @@ jobs:
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.RELEASE_TAG }}
-          name: Command & Conquer: Generals Zero Hour iOS - Shell IPA (${{ env.RELEASE_TAG }})
-          body: |
-            ### Command & Conquer: Generals Zero Hour — iOS Shell IPA (Unsigned)
-            
-            This is the lightweight compiled iOS IPA (~35 MB) for iPhone and iPad running natively on Apple Silicon with Metal / DXVK / MoltenVK and touch controls.
-            
-            #### How to inject your retail game assets on Windows:
-            1. Download `GeneralsXZH-unsigned.ipa` below.
-            2. Place it in your project folder (`GENERALS-IOS`).
-            3. Run in PowerShell:
-               ```powershell
-               .\scripts\inject-gameres.ps1
-               ```
-               *The script auto-detects your Steam / EA App / CD installation, injects your files, and creates `GeneralsXZH-ready-to-sideload.ipa`.*
-            4. Sideload onto your iPhone or iPad using **Sideloadly**, **AltStore**, or **TrollStore**.
-            
-            #### How to inject on macOS / Linux:
-            ```bash
-            ./scripts/inject-gameres.sh
-            ```
-          files: build/GeneralsXZH-unsigned.ipa
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cat << 'EOF' > /tmp/release_notes.md
+          ### Command & Conquer: Generals Zero Hour — iOS Shell IPA (Unsigned)
+          
+          This is the lightweight compiled iOS IPA (~35 MB) for iPhone and iPad running natively on Apple Silicon with Metal / DXVK / MoltenVK and touch controls.
+          
+          #### How to inject your retail game assets on Windows:
+          1. Download `GeneralsXZH-unsigned.ipa` below.
+          2. Place it in your project folder (`GENERALS-IOS`).
+          3. Run in PowerShell:
+             ```powershell
+             .\scripts\inject-gameres.ps1
+             ```
+             *The script auto-detects your Steam / EA App / CD installation, injects your files, and creates `GeneralsXZH-ready-to-sideload.ipa`.*
+          4. Sideload onto your iPhone or iPad using **Sideloadly**, **AltStore**, or **TrollStore**.
+          
+          #### How to inject on macOS / Linux:
+          ```bash
+          ./scripts/inject-gameres.sh
+          ```
+          EOF
+
+          gh release create "${{ env.RELEASE_TAG }}" \
+            --title "Command & Conquer: Generals Zero Hour iOS - Shell IPA (${{ env.RELEASE_TAG }})" \
+            --notes-file /tmp/release_notes.md \
+            build/GeneralsXZH-unsigned.ipa || echo "Release already exists or skipped"
