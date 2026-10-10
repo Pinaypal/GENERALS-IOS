@@ -149,6 +149,36 @@ elseif(APPLE AND SAGE_USE_MOLTENVK)
   # iOS cross-compiles DXVK with a meson cross file (iPhoneOS sysroot); macOS uses
   # the native file. Arch/sysroot flags come from the machine file in both cases.
   if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    # Determine Vulkan include dir for DXVK cross-compilation
+    set(DXVK_VULKAN_INCLUDE_DIR "")
+    if(Vulkan_INCLUDE_DIR AND EXISTS "${Vulkan_INCLUDE_DIR}/vulkan/vulkan.h")
+      set(DXVK_VULKAN_INCLUDE_DIR "${Vulkan_INCLUDE_DIR}")
+    elseif(Vulkan_MoltenVK_INCLUDE_DIR AND EXISTS "${Vulkan_MoltenVK_INCLUDE_DIR}/vulkan/vulkan.h")
+      set(DXVK_VULKAN_INCLUDE_DIR "${Vulkan_MoltenVK_INCLUDE_DIR}")
+    elseif(VULKAN_SDK_ENV AND EXISTS "${VULKAN_SDK_ENV}/include/vulkan/vulkan.h")
+      set(DXVK_VULKAN_INCLUDE_DIR "${VULKAN_SDK_ENV}/include")
+    elseif(DEFINED ENV{VULKAN_SDK} AND EXISTS "$ENV{VULKAN_SDK}/include/vulkan/vulkan.h")
+      set(DXVK_VULKAN_INCLUDE_DIR "$ENV{VULKAN_SDK}/include")
+    elseif(DEFINED ENV{VULKAN_SDK} AND EXISTS "$ENV{VULKAN_SDK}/macOS/include/vulkan/vulkan.h")
+      set(DXVK_VULKAN_INCLUDE_DIR "$ENV{VULKAN_SDK}/macOS/include")
+    endif()
+
+    if(NOT DXVK_VULKAN_INCLUDE_DIR)
+      if(DEFINED ENV{VULKAN_SDK})
+        set(DXVK_VULKAN_INCLUDE_DIR "$ENV{VULKAN_SDK}/include")
+      elseif(VULKAN_SDK_ENV)
+        set(DXVK_VULKAN_INCLUDE_DIR "${VULKAN_SDK_ENV}/include")
+      endif()
+    endif()
+
+    if(DXVK_VULKAN_INCLUDE_DIR)
+      set(DXVK_VULKAN_INC_ARG ", '-I${DXVK_VULKAN_INCLUDE_DIR}'")
+      message(STATUS "DXVK iOS cross-build: Using Vulkan include directory: ${DXVK_VULKAN_INCLUDE_DIR}")
+    else()
+      set(DXVK_VULKAN_INC_ARG "")
+      message(WARNING "DXVK iOS cross-build: Vulkan include directory not found!")
+    endif()
+
     # The cross file is generated from a template so the iPhoneOS SDK path comes
     # from xcrun (Xcode-beta / renamed installs) instead of a hardcoded Xcode.app.
     execute_process(COMMAND xcrun --sdk iphoneos --show-sdk-path
@@ -182,7 +212,16 @@ Cflags: -I\${includedir}
   else()
     set(DXVK_PKG_CONFIG_PATH "${DXVK_SDL3_PC_DIR}")
   endif()
+  if(DXVK_VULKAN_INCLUDE_DIR AND EXISTS "${DXVK_VULKAN_INCLUDE_DIR}/../lib/pkgconfig")
+    set(DXVK_PKG_CONFIG_PATH "${DXVK_PKG_CONFIG_PATH}:${DXVK_VULKAN_INCLUDE_DIR}/../lib/pkgconfig")
+  endif()
   set(DXVK_PKG_CONFIG_ENV "PKG_CONFIG_PATH=${DXVK_PKG_CONFIG_PATH}")
+
+  if(DXVK_VULKAN_INCLUDE_DIR)
+    set(DXVK_VULKAN_INC_ENV "CPATH=${DXVK_VULKAN_INCLUDE_DIR}" "CPLUS_INCLUDE_PATH=${DXVK_VULKAN_INCLUDE_DIR}")
+  else()
+    set(DXVK_VULKAN_INC_ENV "")
+  endif()
 
   if(SAGE_DXVK_USE_LOCAL_FORK AND EXISTS "${DXVK_LOCAL_FORK_DIR}/.git")
     ExternalProject_Add(dxvk_macos_build
@@ -192,7 +231,7 @@ Cflags: -I\${includedir}
       DOWNLOAD_COMMAND  ""
       UPDATE_COMMAND    ""
       PATCH_COMMAND     ""
-      CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CC=clang CXX=clang++ "CFLAGS=-arch ${DXVK_HOST_ARCH} -mcpu=apple-m1" "CXXFLAGS=-arch ${DXVK_HOST_ARCH} -mcpu=apple-m1" "LDFLAGS=-arch ${DXVK_HOST_ARCH}" "${DXVK_PKG_CONFIG_ENV}" ${VULKAN_SDK_ENV_VAR} ${MESON_EXECUTABLE} setup ${DXVK_BUILD_DIR} ${DXVK_SOURCE_DIR} ${DXVK_MESON_MACHINE_ARGS} -Ddxvk_native_wsi=sdl3 --buildtype=release --reconfigure
+      CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CC=clang CXX=clang++ "CFLAGS=-arch ${DXVK_HOST_ARCH} -mcpu=apple-m1" "CXXFLAGS=-arch ${DXVK_HOST_ARCH} -mcpu=apple-m1" "LDFLAGS=-arch ${DXVK_HOST_ARCH}" "${DXVK_PKG_CONFIG_ENV}" ${VULKAN_SDK_ENV_VAR} ${DXVK_VULKAN_INC_ENV} ${MESON_EXECUTABLE} setup ${DXVK_BUILD_DIR} ${DXVK_SOURCE_DIR} ${DXVK_MESON_MACHINE_ARGS} -Ddxvk_native_wsi=sdl3 --buildtype=release --reconfigure
       BUILD_COMMAND     ${NINJA_EXECUTABLE} -C ${DXVK_BUILD_DIR} src/d3d9/libdxvk_d3d9.0.dylib src/d3d8/libdxvk_d3d8.0.dylib
       INSTALL_COMMAND   ""
       UPDATE_DISCONNECTED TRUE
@@ -209,7 +248,7 @@ Cflags: -I\${includedir}
       SOURCE_DIR        ${DXVK_SOURCE_DIR}
       BINARY_DIR        ${DXVK_BUILD_DIR}
       PATCH_COMMAND     ""
-      CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CC=clang CXX=clang++ "CFLAGS=-arch ${DXVK_HOST_ARCH} -mcpu=apple-m1" "CXXFLAGS=-arch ${DXVK_HOST_ARCH} -mcpu=apple-m1" "LDFLAGS=-arch ${DXVK_HOST_ARCH}" "${DXVK_PKG_CONFIG_ENV}" ${VULKAN_SDK_ENV_VAR} ${MESON_EXECUTABLE} setup ${DXVK_BUILD_DIR} ${DXVK_SOURCE_DIR} ${DXVK_MESON_MACHINE_ARGS} -Ddxvk_native_wsi=sdl3 --buildtype=release --reconfigure
+      CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CC=clang CXX=clang++ "CFLAGS=-arch ${DXVK_HOST_ARCH} -mcpu=apple-m1" "CXXFLAGS=-arch ${DXVK_HOST_ARCH} -mcpu=apple-m1" "LDFLAGS=-arch ${DXVK_HOST_ARCH}" "${DXVK_PKG_CONFIG_ENV}" ${VULKAN_SDK_ENV_VAR} ${DXVK_VULKAN_INC_ENV} ${MESON_EXECUTABLE} setup ${DXVK_BUILD_DIR} ${DXVK_SOURCE_DIR} ${DXVK_MESON_MACHINE_ARGS} -Ddxvk_native_wsi=sdl3 --buildtype=release --reconfigure
       BUILD_COMMAND     ${NINJA_EXECUTABLE} -C ${DXVK_BUILD_DIR} src/d3d9/libdxvk_d3d9.0.dylib src/d3d8/libdxvk_d3d8.0.dylib
       INSTALL_COMMAND   ""
       UPDATE_DISCONNECTED FALSE

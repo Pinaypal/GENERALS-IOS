@@ -179,9 +179,14 @@ TouchState s_touch;
 const Uint64 LONG_PRESS_MS = 600;
 const float PINCH_STEP_RATIO = 0.06f;  // 6% distance change per wheel tick
 const float TAP_DEAD_ZONE_PX = 8.0f;   // jitter below this keeps a tap a tap
+const Uint64 DOUBLE_TAP_MAX_MS = 320;  // double-tap window for select-all-of-type / attack-move
+const float DOUBLE_TAP_MAX_PX = 25.0f; // maximum movement between consecutive taps
+static Uint64 s_lastTapTicks = 0;
+static float s_lastTapX = 0.0f;
+static float s_lastTapY = 0.0f;
 
 void sendSyntheticMouse(SDL3Mouse *mouse, SDL_Window *window, Uint32 type,
-                        float x, float y, Uint8 button = 0, float wheelY = 0.0f)
+                        float x, float y, Uint8 button = 0, float wheelY = 0.0f, Uint8 clicks = 1)
 {
 	// The windowID must be valid: SDL3Mouse::scaleMouseCoordinates() looks the
 	// window up by id to map window points into the game's internal resolution,
@@ -202,7 +207,7 @@ void sendSyntheticMouse(SDL3Mouse *mouse, SDL_Window *window, Uint32 type,
 			ev.button.windowID = windowID;
 			ev.button.button = button;
 			ev.button.down = (type == SDL_EVENT_MOUSE_BUTTON_DOWN);
-			ev.button.clicks = 1;
+			ev.button.clicks = clicks;
 			ev.button.x = x;
 			ev.button.y = y;
 			break;
@@ -339,24 +344,40 @@ void handleTouchEvent(SDL3Mouse *mouse, SDL_Window *window, const SDL_Event &eve
 			break;
 		}
 		switch (s_touch.phase) {
-			case TouchState::PENDING:
+			case TouchState::PENDING: {
 				// A CANCELED touch (incoming call, notification shade, palm
 				// rejection) must not become a committed tap — that would be a
 				// phantom select/command/rally-point click at the cancel point.
 				if (event.type == SDL_EVENT_FINGER_CANCELED) {
 					break;
 				}
+				// GeneralsX @feature msudario 10/10/2026 Double-tap detection for select-all-of-type / attack-move
+				const Uint64 now = SDL_GetTicks();
+				Uint8 clicks = 1;
+				if ((now - s_lastTapTicks) <= DOUBLE_TAP_MAX_MS &&
+				    (SDL_fabsf(s_touch.downX - s_lastTapX) + SDL_fabsf(s_touch.downY - s_lastTapY)) <= DOUBLE_TAP_MAX_PX) {
+					clicks = 2;
+					s_lastTapTicks = 0;
+				} else {
+					s_lastTapTicks = now;
+				}
+				s_lastTapX = s_touch.downX;
+				s_lastTapY = s_touch.downY;
+
 				// Clean tap: deliver the full click at the exact press position.
 				sendSyntheticMouse(mouse, window, SDL_EVENT_MOUSE_MOTION, s_touch.downX, s_touch.downY);
 				sendSyntheticMouse(mouse, window, SDL_EVENT_MOUSE_BUTTON_DOWN,
-				                   s_touch.downX, s_touch.downY, SDL_BUTTON_LEFT);
+				                   s_touch.downX, s_touch.downY, SDL_BUTTON_LEFT, 0.0f, clicks);
 				sendSyntheticMouse(mouse, window, SDL_EVENT_MOUSE_BUTTON_UP,
-				                   s_touch.downX, s_touch.downY, SDL_BUTTON_LEFT);
+				                   s_touch.downX, s_touch.downY, SDL_BUTTON_LEFT, 0.0f, clicks);
 				break;
+			}
 			case TouchState::DRAGGING:
+				s_lastTapTicks = 0;
 				sendSyntheticMouse(mouse, window, SDL_EVENT_MOUSE_BUTTON_UP, px, py, SDL_BUTTON_LEFT);
 				break;
 			case TouchState::PAN:
+				s_lastTapTicks = 0;
 				sendSyntheticMouse(mouse, window, SDL_EVENT_MOUSE_BUTTON_UP,
 				                   s_touch.panX, s_touch.panY, SDL_BUTTON_RIGHT);
 				break;
@@ -381,6 +402,7 @@ void resetTouchState(SDL3Mouse *mouse, SDL_Window *window)
 		}
 	}
 	s_touch = TouchState();
+	s_lastTapTicks = 0;
 }
 
 // Called once per engine frame (not just per touch event): a perfectly
