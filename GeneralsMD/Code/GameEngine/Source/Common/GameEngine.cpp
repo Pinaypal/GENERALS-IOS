@@ -735,6 +735,8 @@ void GameEngine::init()
 		{
 			TheWritableGlobalData->m_framesPerSecondLimit = BaseFps;
 		}
+#endif
+
 		TheFramePacer->setFramesPerSecondLimit(TheGlobalData->m_framesPerSecondLimit);
 		// GeneralsX @bugfix msudario 10/10/2026 Ensure logic time scale is decoupled from render FPS
 		TheFramePacer->setLogicTimeScaleFps(LOGICFRAMES_PER_SECOND);
