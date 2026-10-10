@@ -88,30 +88,79 @@ cd GeneralsX
 cd ~/GeneralsX/GeneralsZH && ./run.sh -win
 ```
 
-## Quick start — iPhone / iPad
+## Quick start — iPhone / iPad (Sideloading with Asset Injection)
 
-On top of the macOS prerequisites: full Xcode (signed into your Apple ID),
-`brew install xcodegen`, and a (free or paid) Apple Developer team.
+**The easiest way to play on iPhone & iPad — no Mac or Xcode required!**
 
-```sh
-cd GeneralsX
-git submodule update --init references/fbraz3-dxvk   # iOS DXVK is built from this + Patches/dxvk-ios.patch
-./scripts/build/ios/fetch-moltenvk.sh                # pinned MoltenVK.framework (checksummed)
-./scripts/build/ios/stage-fonts.sh                   # Liberation fonts, renamed as the game expects
-cmake --preset ios-vulkan
-cmake --build build/ios-vulkan --target z_generals
-GX_TEAM_ID=<your-team-id> GX_BUNDLE_ID=com.you.generalszh \
-    ./scripts/build/ios/package-ios-zh.sh --install  # assembles, signs, installs
+### Step 1: Download the Shell IPA
+1. Go to the **[GitHub Actions](https://github.com/msudario018/GENERALS-IOS/actions)** tab or **Releases**.
+2. Download `GeneralsXZH-unsigned.ipa` (~35 MB).
+3. Place `GeneralsXZH-unsigned.ipa` in your project folder (or anywhere on your PC).
+
+### Step 2: Inject Your Retail Game Assets
+
+#### On Windows (PowerShell):
+Open PowerShell in the repository root and run:
+```powershell
+.\scripts\inject-gameres.ps1
+```
+> The script auto-detects your Steam / EA App install, injects your `.big` archives, base game data (`ZH_Generals`), and configuration, and creates `GeneralsXZH-ready-to-sideload.ipa`.
+> You can also specify your game path explicitly:
+> ```powershell
+> .\scripts\inject-gameres.ps1 -GameDir "C:\Program Files (x86)\Steam\steamapps\common\Command & Conquer Generals - Zero Hour"
+> ```
+
+#### On macOS / Linux (Terminal):
+```bash
+./scripts/inject-gameres.sh "/path/to/Zero Hour"
 ```
 
-Find your team id in Xcode → Settings → Accounts. Assets ship inside the app
-bundle (self-contained install); `--dev` skips the ~2.7 GB copy for fast code
-iteration.
+### Step 3: Sideload onto iPhone or iPad
+1. Connect your iPhone or iPad to your PC / Mac.
+2. Open **[Sideloadly](https://sideloadly.io/)** (or AltServer / TrollStore).
+3. Drag and drop `GeneralsXZH-ready-to-sideload.ipa` into Sideloadly.
+4. Enter your Apple ID and click **Start**.
+5. On your iOS device, go to **Settings > General > VPN & Device Management** and trust your developer certificate.
+6. Launch **Generals Zero Hour** and enjoy native RTS with touch controls!
+
+---
+
+## Building the iOS IPA from Source (macOS)
+
+If you prefer building the IPA yourself on a Mac:
+
+Prerequisites:
+- Xcode 16/15
+- `brew install cmake ninja meson pkg-config autoconf autoconf-archive automake libtool glslang xcodegen sdl3`
+- vcpkg and LunarG Vulkan SDK configured
+
+```sh
+cd GENERALS-IOS
+git submodule update --init references/fbraz3-dxvk   # iOS DXVK local fork
+./scripts/build/ios/build-ios-zh.sh --ipa           # builds engine + packages unsigned IPA
+```
+The output IPA will be in `build/GeneralsXZH-unsigned.ipa`.
+
+To build and install directly to a connected test device with your Apple Developer team:
+```sh
+GX_TEAM_ID=<your-team-id> GX_BUNDLE_ID=com.you.generalszh \
+    ./scripts/build/ios/package-ios-zh.sh --install
+```
+
+Assets can ship directly inside the app bundle (self-contained install); `--dev` skips bundling the ~2.7 GB data so you can test quickly and inject via script or Documents folder.
+
+---
 
 ## Where things are
 
 | Path | What it is |
 |---|---|
+| [`.github/workflows/build-ios.yml`](.github/workflows/build-ios.yml) | Automated CI workflow building the unsigned iOS IPA |
+| [`scripts/inject-gameres.ps1`](scripts/inject-gameres.ps1) | Windows PowerShell script to inject retail game assets into the iOS IPA |
+| [`scripts/inject-gameres.sh`](scripts/inject-gameres.sh) | macOS/Linux bash script to inject retail game assets into the iOS IPA |
+| [`scripts/prepare-game-assets.ps1`](scripts/prepare-game-assets.ps1) | Asset exporter staging clean retail data to `gameres-export/` |
+| [`scripts/build/ios/build-ios-zh.sh`](scripts/build/ios/build-ios-zh.sh) | Complete one-shot macOS build script for iOS engine + packaging |
+| [`scripts/build/ios/package-ios-zh.sh`](scripts/build/ios/package-ios-zh.sh) | Assembles the iOS .app, frameworks, ad-hoc/team codesigning, and .ipa |
 | [`docs/port/PORTING_PLAYBOOK.md`](docs/port/PORTING_PLAYBOOK.md) | The complete engineering log of this port: every failure mode, root cause, fix — start with [§8, the bug archaeology](docs/port/PORTING_PLAYBOOK.md#8-post-ship-bug-hunts-junejuly-2026--the-archaeology-section): the black minimap, the silent EVA lines, and the chirp |
 | `docs/port/PORTING_PATTERNS.md` | Generalized methodology for porting classic Windows games to Apple platforms |
 | `docs/port/RELEASE_CHECKLIST.md` | Gate for public release |

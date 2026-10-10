@@ -6,11 +6,21 @@ set -euo pipefail
 
 MVK_VERSION="v1.4.1"
 MVK_SHA256="54336b90212c390ed5935c96460aed3bf651ad7d3c0f0e956586ce18e9c0b701"
-DEST="${GX_MOLTENVK_ROOT:-${HOME}/GeneralsX/MoltenVK}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+
+DEST="${GX_MOLTENVK_ROOT:-}"
+if [[ -z "${DEST}" ]]; then
+    if [[ -d "${HOME}/GeneralsX/MoltenVK" ]]; then
+        DEST="${HOME}/GeneralsX/MoltenVK"
+    else
+        DEST="${PROJECT_ROOT}/build/MoltenVK"
+    fi
+fi
 
 mkdir -p "${DEST}"
 cd "${DEST}"
-if [[ -d "MoltenVK/MoltenVK/dynamic/MoltenVK.xcframework/ios-arm64/MoltenVK.framework" ]]; then
+if [[ -d "MoltenVK/MoltenVK/dynamic/MoltenVK.xcframework/ios-arm64/MoltenVK.framework" || -d "MoltenVK/dynamic/MoltenVK.xcframework/ios-arm64/MoltenVK.framework" ]]; then
     echo "MoltenVK already staged at ${DEST}"
     exit 0
 fi

@@ -10,7 +10,7 @@
 # those at your own Apple Developer account rather than editing this file.
 name: GeneralsXZH
 options:
-  bundleIdPrefix: me.ammaar
+  bundleIdPrefix: com.cnc
   deploymentTarget:
     iOS: "16.0"
 targets:
@@ -21,8 +21,8 @@ targets:
       - path: Stub
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: me.ammaar.generalszh
-        DEVELOPMENT_TEAM: 7S264298H8
+        PRODUCT_BUNDLE_IDENTIFIER: com.cnc.generalszh
+        DEVELOPMENT_TEAM: ""
         CODE_SIGN_STYLE: Automatic
         TARGETED_DEVICE_FAMILY: "1,2"
         INFOPLIST_KEY_UIRequiresFullScreen: YES

@@ -1,0 +1,172 @@
+name: Build Generals Zero Hour iOS IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      bundle_id:
+        description: "App Bundle ID"
+        required: false
+        default: "com.cnc.generalszh"
+        type: string
+      create_release:
+        description: "Create/Update GitHub Release with IPA"
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    paths:
+      - 'ios/**'
+      - 'scripts/build/ios/**'
+      - '.github/workflows/build-ios.yml'
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+      - 'cmake/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build-ios-ipa:
+    name: Build iOS IPA (arm64)
+    runs-on: macos-14
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Select Xcode Version
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer 2>/dev/null || \
+          sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer 2>/dev/null || \
+          sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer 2>/dev/null || \
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Checkout DXVK Fork Submodule
+        run: |
+          echo "Checking out references/fbraz3-dxvk submodule..."
+          git submodule update --init references/fbraz3-dxvk
+
+      - name: Cache Homebrew
+        id: cache-brew
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/Homebrew
+          key: brew-ios-${{ runner.os }}-${{ hashFiles('.github/workflows/build-ios.yml') }}
+          restore-keys: |
+            brew-ios-${{ runner.os }}-
+
+      - name: Install Build Tools
+        run: |
+          echo "Installing iOS build prerequisites..."
+          brew update
+          brew install cmake ninja meson pkg-config autoconf autoconf-archive automake libtool glslang xcodegen sdl3
+          cmake --version | head -1
+          ninja --version | head -1
+          meson --version | head -1
+          xcodegen --version || true
+
+      - name: Cache Vulkan SDK
+        id: cache-vulkan-sdk
+        uses: actions/cache@v4
+        with:
+          path: ~/VulkanSDK
+          key: vulkan-sdk-macos-1.4.341.1
+
+      - name: Install LunarG Vulkan SDK
+        if: steps.cache-vulkan-sdk.outputs.cache-hit != 'true'
+        run: |
+          echo "Downloading LunarG Vulkan SDK 1.4.341.1..."
+          VULKAN_ZIP="/tmp/vulkansdk-macos-1.4.341.1.zip"
+          VULKAN_URL="https://sdk.lunarg.com/sdk/download/1.4.341.1/mac/vulkansdk-macos-1.4.341.1.zip"
+          
+          curl -fL --retry 3 -o "$VULKAN_ZIP" "$VULKAN_URL"
+          mkdir -p /tmp/vulkan-extract
+          unzip -q "$VULKAN_ZIP" -d /tmp/vulkan-extract
+          
+          VULKAN_APP=$(find /tmp/vulkan-extract -name "*.app" -type d | head -1)
+          if [ -n "$VULKAN_APP" ]; then
+            INSTALLER="$VULKAN_APP/Contents/MacOS/vulkansdk-macOS-1.4.341.1"
+            INSTALL_TARGET="$HOME/VulkanSDK/1.4.341.1"
+            echo "Running Vulkan SDK installer..."
+            "$INSTALLER" --root "$INSTALL_TARGET" --accept-licenses --default-answer --confirm-command install
+          fi
+          rm -rf /tmp/vulkan-extract "$VULKAN_ZIP"
+
+      - name: Locate Vulkan SDK
+        run: |
+          SDK_DIR="$HOME/VulkanSDK/1.4.341.1/macOS"
+          if [ ! -d "$SDK_DIR" ]; then
+            SDK_DIR="$HOME/VulkanSDK/1.4.341.1"
+          fi
+          echo "VULKAN_SDK=$SDK_DIR" >> $GITHUB_ENV
+          echo "Vulkan SDK located at: $SDK_DIR"
+          ls -la "$SDK_DIR/lib" || true
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: 'ffc071e0c08432c60c9b64f00334c0227667931b'
+
+      - name: Fetch Dynamic MoltenVK & Stage Fonts
+        run: |
+          chmod +x scripts/build/ios/*.sh
+          ./scripts/build/ios/fetch-moltenvk.sh
+          ./scripts/build/ios/stage-fonts.sh
+
+      - name: Configure CMake (ios-vulkan preset)
+        run: |
+          cmake --preset ios-vulkan
+
+      - name: Compile Generals Zero Hour Engine
+        run: |
+          cmake --build build/ios-vulkan --target z_generals --config RelWithDebInfo
+
+      - name: Package Unsigned iOS IPA
+        run: |
+          BUNDLE_ID="${{ inputs.bundle_id || 'com.cnc.generalszh' }}"
+          echo "Packaging Generals Zero Hour IPA with bundle ID: $BUNDLE_ID"
+          GX_BUNDLE_ID="$BUNDLE_ID" ./scripts/build/ios/package-ios-zh.sh --dev --unsigned --ipa
+          ls -lh build/GeneralsXZH-unsigned.ipa
+
+      - name: Upload Shell IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GeneralsXZH-Shell-unsigned
+          path: build/GeneralsXZH-unsigned.ipa
+          retention-days: 7
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.create_release == true
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name || 'v1.0.4-ios' }}
+          name: Command & Conquer: Generals Zero Hour iOS - Shell IPA (${{ github.ref_name || 'v1.0.4' }})
+          body: |
+            ### Command & Conquer: Generals Zero Hour — iOS Shell IPA (Unsigned)
+            
+            This is the lightweight compiled iOS IPA (~35 MB) for iPhone and iPad running natively on Apple Silicon with Metal / DXVK / MoltenVK and touch controls.
+            
+            #### How to inject your retail game assets on Windows:
+            1. Download `GeneralsXZH-unsigned.ipa` below.
+            2. Place it in your project folder (`GENERALS-IOS`).
+            3. Run in PowerShell:
+               ```powershell
+               .\scripts\inject-gameres.ps1
+               ```
+               *The script auto-detects your Steam / EA App / CD installation, injects your files, and creates `GeneralsXZH-ready-to-sideload.ipa`.*
+            4. Sideload onto your iPhone or iPad using **Sideloadly**, **AltStore**, or **TrollStore**.
+            
+            #### How to inject on macOS / Linux:
+            ```bash
+            ./scripts/inject-gameres.sh
+            ```
+          files: build/GeneralsXZH-unsigned.ipa
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

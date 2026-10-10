@@ -6,7 +6,17 @@ set -euo pipefail
 
 LIB_VERSION="2.1.5"
 LIB_SHA256="7191c669bf38899f73a2094ed00f7b800553364f90e2637010a69c0e268f25d0"
-DEST="${GX_FONTS:-${HOME}/GeneralsX/ios-staging/fonts}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+
+DEST="${GX_FONTS:-}"
+if [[ -z "${DEST}" ]]; then
+    if [[ -d "${HOME}/GeneralsX/ios-staging/fonts" ]]; then
+        DEST="${HOME}/GeneralsX/ios-staging/fonts"
+    else
+        DEST="${PROJECT_ROOT}/build/ios-staging/fonts"
+    fi
+fi
 TMP="$(mktemp -d)"
 trap 'rm -rf "${TMP}"' EXIT
 

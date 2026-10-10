@@ -96,3 +96,10 @@ logs_*.zip
 # iOS shell-app build products (XcodeGen regenerates the project from ios/project.yml)
 ios/build/
 ios/GeneralsXZH.xcodeproj/
+
+# iOS IPAs and game asset staging (no copyrighted assets in git)
+*.ipa
+gameres-export/
+/build/
+ios-staging/
+MoltenVK/
