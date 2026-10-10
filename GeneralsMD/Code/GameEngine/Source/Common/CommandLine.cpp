@@ -492,6 +492,16 @@ Int parseYRes(char *args[], int num)
 	return 1;
 }
 
+// GeneralsX @feature msudario 10/10/2026 Allow -fps in Release builds (ProMotion 120Hz support)
+Int parseFPSLimit(char *args[], int num)
+{
+	if (num > 1)
+	{
+		TheWritableGlobalData->m_framesPerSecondLimit = atoi(args[1]);
+	}
+	return 2;
+}
+
 #if defined(RTS_DEBUG)
 //=============================================================================
 //=============================================================================
@@ -573,17 +583,6 @@ Int parseNoStaticLOD(char *args[], int num)
 	TheWritableGlobalData->m_enableStaticLOD = FALSE;
 
 	return 1;
-}
-
-//=============================================================================
-//=============================================================================
-Int parseFPSLimit(char *args[], int num)
-{
-	if (num > 1)
-	{
-		TheWritableGlobalData->m_framesPerSecondLimit = atoi(args[1]);
-	}
-	return 2;
 }
 
 //=============================================================================
