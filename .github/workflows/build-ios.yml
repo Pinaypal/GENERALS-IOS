@@ -34,21 +34,40 @@ jobs:
           echo "Checking out references/fbraz3-dxvk submodule recursively..."
           git submodule update --init --recursive references/fbraz3-dxvk
 
-      - name: Cache Homebrew
-        id: cache-brew
-        uses: actions/cache@v5
-        with:
-          path: ~/Library/Caches/Homebrew
-          key: brew-ios-${{ runner.os }}-${{ hashFiles('.github/workflows/build-ios.yml') }}
-          restore-keys: |
-            brew-ios-${{ runner.os }}-
-
       - name: Install Build Tools
         run: |
           echo "Installing iOS build prerequisites..."
           echo "/opt/homebrew/bin" >> $GITHUB_PATH
-          brew update
-          brew install cmake ninja meson pkg-config autoconf autoconf-archive automake libtool glslang xcodegen sdl3
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+          # Purge any stale Homebrew backup files to prevent inode/hardlink collisions
+          rm -rf ~/Library/Caches/Homebrew/Backup 2>/dev/null || true
+
+          # Disable brew auto-update to avoid rebuilding dependencies from source
+          export HOMEBREW_NO_AUTO_UPDATE=1
+          export HOMEBREW_NO_INSTALL_CLEANUP=1
+
+          # Meson via pipx (instant, avoids pulling in python3.13 / openssl@4 source rebuilds)
+          pipx install meson || true
+
+          # Install packages needed for iOS build
+          brew install autoconf-archive glslang xcodegen sdl3 || true
+
+          if ! command -v meson &>/dev/null; then
+            brew install meson || true
+          fi
+
+          # Ensure essential build tools are present
+          MISSING_TOOLS=()
+          for tool in cmake ninja pkg-config autoconf automake libtool; do
+            if ! command -v "$tool" &>/dev/null; then
+              MISSING_TOOLS+=("$tool")
+            fi
+          done
+          if [ ${#MISSING_TOOLS[@]} -gt 0 ]; then
+            brew install "${MISSING_TOOLS[@]}"
+          fi
+
           cmake --version | head -1
           ninja --version | head -1
           meson --version | head -1

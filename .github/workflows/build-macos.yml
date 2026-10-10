@@ -48,14 +48,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Cache brew packages
-        id: cache-brew
-        uses: actions/cache@v5
-        with:
-          path: ~/Library/Caches/Homebrew
-          key: brew-macos-${{ runner.os }}-${{ hashFiles('.github/workflows/build-macos.yml') }}
-          restore-keys: |
-            brew-macos-${{ runner.os }}-
 
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
@@ -65,6 +57,7 @@ jobs:
       - name: Install Dependencies
         run: |
           echo "Installing macOS build dependencies..."
+          rm -rf ~/Library/Caches/Homebrew/Backup 2>/dev/null || true
           
           # Update Homebrew to ensure fresh formulas
           brew update
