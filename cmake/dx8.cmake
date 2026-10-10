@@ -72,6 +72,17 @@ elseif(APPLE AND SAGE_USE_MOLTENVK)
     # already carries it (reverse-check passes), fail the configure otherwise
     # so an unpatched DXVK can never ship silently.
     if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+      # Ensure DXVK nested submodules (include/native/directx for d3d9.h / d3d11_4.h) are initialized
+      if(NOT EXISTS "${DXVK_LOCAL_FORK_DIR}/include/native/directx/d3d9.h")
+        message(STATUS "DXVK iOS: initializing nested submodules in references/fbraz3-dxvk...")
+        execute_process(
+          COMMAND git -C "${DXVK_LOCAL_FORK_DIR}" submodule update --init --recursive
+          RESULT_VARIABLE DXVK_SUBMODULE_RESULT)
+        if(NOT DXVK_SUBMODULE_RESULT EQUAL 0)
+          message(WARNING "DXVK iOS: Failed to recursively update submodules in ${DXVK_LOCAL_FORK_DIR}")
+        endif()
+      endif()
+
       execute_process(
         COMMAND git -C "${DXVK_LOCAL_FORK_DIR}" apply --reverse --check "${CMAKE_SOURCE_DIR}/Patches/dxvk-ios.patch"
         RESULT_VARIABLE DXVK_PATCH_ALREADY_APPLIED

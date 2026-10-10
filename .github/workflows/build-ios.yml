@@ -31,8 +31,8 @@ jobs:
 
       - name: Checkout DXVK Fork Submodule
         run: |
-          echo "Checking out references/fbraz3-dxvk submodule..."
-          git submodule update --init references/fbraz3-dxvk
+          echo "Checking out references/fbraz3-dxvk submodule recursively..."
+          git submodule update --init --recursive references/fbraz3-dxvk
 
       - name: Cache Homebrew
         id: cache-brew
