@@ -799,12 +799,19 @@ void SDL3Mouse::scaleMouseCoordinates(int rawX, int rawY, Uint32 windowID, int& 
 
 	int pbX, pbY, pbW, pbH;
 	if (TheDisplay->getViewportRect(pbX, pbY, pbW, pbH)) {
-		int clampedX = rawX - pbX;
-		if (clampedX < 0) clampedX = 0;
-		if (clampedX > pbW) clampedX = pbW;
-		int clampedY = rawY - pbY;
-		if (clampedY < 0) clampedY = 0;
-		if (clampedY > pbH) clampedY = pbH;
+		int pixelW = 0, pixelH = 0;
+		SDL_GetWindowSizeInPixels(window, &pixelW, &pixelH);
+		const float toPixelX = (pixelW > 0) ? ((float)pixelW / (float)windowWidth) : 1.0f;
+		const float toPixelY = (pixelH > 0) ? ((float)pixelH / (float)windowHeight) : 1.0f;
+		const float rawPixX = (float)rawX * toPixelX;
+		const float rawPixY = (float)rawY * toPixelY;
+
+		float clampedX = rawPixX - (float)pbX;
+		if (clampedX < 0.0f) clampedX = 0.0f;
+		if (clampedX > (float)pbW) clampedX = (float)pbW;
+		float clampedY = rawPixY - (float)pbY;
+		if (clampedY < 0.0f) clampedY = 0.0f;
+		if (clampedY > (float)pbH) clampedY = (float)pbH;
 		scaledX = static_cast<int>(clampedX * static_cast<float>(internalWidth) / static_cast<float>(pbW));
 		scaledY = static_cast<int>(clampedY * static_cast<float>(internalHeight) / static_cast<float>(pbH));
 		return;

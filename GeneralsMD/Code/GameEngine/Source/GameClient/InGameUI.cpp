@@ -962,10 +962,44 @@ void INI::parseInGameUIDefinition( INI* ini )
 namespace
 {
 	// helpers for inline counters
-	constexpr const Int kHudAnchorX = 3;
-	constexpr const Int kHudAnchorY = -1;
+	constexpr const Int kHudDefaultAnchorX = 3;
+	constexpr const Int kHudDefaultAnchorY = -1;
 	constexpr const Int kHudGapPx = 6;
-	inline Bool isAtHudAnchorPos(const Coord2D &p) { return p.x == kHudAnchorX && p.y == kHudAnchorY; }
+
+	inline Int getHudAnchorX()
+	{
+		if (TheDisplay)
+		{
+			const Int w = TheDisplay->getWidth();
+			const Int h = TheDisplay->getHeight();
+			if (h > 0 && ((float)w / (float)h) > 1.85f)
+			{
+				// GeneralsX @feature msudario 10/10/2026 Inset HUD away from Dynamic Island & curved corners
+				return static_cast<Int>(h * (56.0f / 393.0f));
+			}
+		}
+		return kHudDefaultAnchorX;
+	}
+
+	inline Int getHudAnchorY()
+	{
+		if (TheDisplay)
+		{
+			const Int w = TheDisplay->getWidth();
+			const Int h = TheDisplay->getHeight();
+			if (h > 0 && ((float)w / (float)h) > 1.85f)
+			{
+				return static_cast<Int>(h * (16.0f / 393.0f));
+			}
+		}
+		return kHudDefaultAnchorY;
+	}
+
+	inline Bool isAtHudAnchorPos(const Coord2D &p)
+	{
+		return (p.x == kHudDefaultAnchorX && p.y == kHudDefaultAnchorY) ||
+		       (p.x == getHudAnchorX() && p.y == getHudAnchorY());
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1085,7 +1119,7 @@ InGameUI::InGameUI()
 	m_militaryCaptionColor.green = 200;
 	m_militaryCaptionColor.blue  = 30;
 	m_militaryCaptionColor.alpha = 255;
-	m_militaryCaptionPosition.x = 10;
+	m_militaryCaptionPosition.x = (Real)getHudAnchorX();
 	m_militaryCaptionPosition.y = 380;
 
 	m_militaryCaptionTitleFont = "Courier";
@@ -1158,8 +1192,8 @@ InGameUI::InGameUI()
 	m_networkLatencyFont = "Tahoma";
 	m_networkLatencyPointSize = TheGlobalData->m_networkLatencyFontSize;
 	m_networkLatencyBold = TRUE;
-	m_networkLatencyPosition.x = kHudAnchorX;
-	m_networkLatencyPosition.y = kHudAnchorY;
+	m_networkLatencyPosition.x = getHudAnchorX();
+	m_networkLatencyPosition.y = getHudAnchorY();
 	m_networkLatencyColor = GameMakeColor( 173, 216, 255, 255 );
 	m_networkLatencyDropColor = GameMakeColor( 0, 0, 0, 255 );
 	m_lastNetworkLatencyFrames = ~0u;
@@ -1169,8 +1203,8 @@ InGameUI::InGameUI()
 	m_renderFpsFont = "Tahoma";
 	m_renderFpsPointSize = TheGlobalData->m_renderFpsFontSize;
 	m_renderFpsBold = TRUE;
-	m_renderFpsPosition.x = kHudAnchorX;
-	m_renderFpsPosition.y = kHudAnchorY;
+	m_renderFpsPosition.x = getHudAnchorX();
+	m_renderFpsPosition.y = getHudAnchorY();
 	m_renderFpsColor = GameMakeColor( 255, 255, 0, 255 );
 	m_renderFpsLimitColor = GameMakeColor(119, 119, 119, 255);
 	m_renderFpsDropColor = GameMakeColor( 0, 0, 0, 255 );
@@ -1183,8 +1217,8 @@ InGameUI::InGameUI()
 	m_systemTimeFont = "Tahoma";
 	m_systemTimePointSize = TheGlobalData->m_systemTimeFontSize;
 	m_systemTimeBold = TRUE;
-	m_systemTimePosition.x = kHudAnchorX; // TheSuperHackers @info relative to the left of the screen
-	m_systemTimePosition.y = kHudAnchorY;
+	m_systemTimePosition.x = getHudAnchorX(); // TheSuperHackers @info relative to the left of the screen
+	m_systemTimePosition.y = getHudAnchorY();
 	m_systemTimeColor = GameMakeColor( 255, 255, 255, 255 );
 	m_systemTimeDropColor = GameMakeColor( 0, 0, 0, 255 );
 
@@ -1193,8 +1227,8 @@ InGameUI::InGameUI()
 	m_gameTimeFont = "Tahoma";
 	m_gameTimePointSize = TheGlobalData->m_gameTimeFontSize;
 	m_gameTimeBold = TRUE;
-	m_gameTimePosition.x = kHudAnchorX; // TheSuperHackers @info relative to the right of the screen
-	m_gameTimePosition.y = kHudAnchorY;
+	m_gameTimePosition.x = getHudAnchorX(); // TheSuperHackers @info relative to the right of the screen
+	m_gameTimePosition.y = getHudAnchorY();
 	m_gameTimeColor = GameMakeColor( 255, 255, 255, 255 );
 	m_gameTimeDropColor = GameMakeColor( 0, 0, 0, 255 );
 
@@ -6170,7 +6204,7 @@ void InGameUI::drawNetworkLatency(Int &x, Int &y)
 	// TheSuperHackers @info at the HUD anchor this draws inline and advances x otherwise uses configured position
 	if (isAtHudAnchorPos(m_networkLatencyPosition))
 	{
-		m_networkLatencyString->draw(kHudAnchorX + x, kHudAnchorY + y, m_networkLatencyColor, m_networkLatencyDropColor);
+		m_networkLatencyString->draw(getHudAnchorX() + x, getHudAnchorY() + y, m_networkLatencyColor, m_networkLatencyDropColor);
 		x += m_networkLatencyString->getWidth() + kHudGapPx;
 	}
 	else
@@ -6216,11 +6250,11 @@ void InGameUI::drawRenderFps(Int &x, Int &y)
 	// TheSuperHackers @info at the HUD anchor this draws inline and advances x otherwise uses configured position
 	if (isAtHudAnchorPos(m_renderFpsPosition))
 	{
-		const Int drawY = kHudAnchorY + y;
+		const Int drawY = getHudAnchorY() + y;
 
-		m_renderFpsString->draw(kHudAnchorX + x, drawY, m_renderFpsColor, m_renderFpsDropColor);
+		m_renderFpsString->draw(getHudAnchorX() + x, drawY, m_renderFpsColor, m_renderFpsDropColor);
 		x += m_renderFpsString->getWidth();
-		m_renderFpsLimitString->draw(kHudAnchorX + x, drawY, m_renderFpsLimitColor, m_renderFpsDropColor);
+		m_renderFpsLimitString->draw(getHudAnchorX() + x, drawY, m_renderFpsLimitColor, m_renderFpsDropColor);
 		x += m_renderFpsLimitString->getWidth() + kHudGapPx;
 	}
 	else
@@ -6243,7 +6277,7 @@ void InGameUI::drawSystemTime(Int &x, Int &y)
 	// TheSuperHackers @info at the HUD anchor this draws inline and advances x otherwise uses configured position
 	if (isAtHudAnchorPos(m_systemTimePosition))
 	{
-		m_systemTimeString->draw(kHudAnchorX + x, kHudAnchorY + y, m_systemTimeColor, m_systemTimeDropColor);
+		m_systemTimeString->draw(getHudAnchorX() + x, getHudAnchorY() + y, m_systemTimeColor, m_systemTimeDropColor);
 		x += m_systemTimeString->getWidth() + kHudGapPx;
 	}
 	else
@@ -6270,16 +6304,23 @@ void InGameUI::drawGameTime()
     m_gameTimeFrameString->setText(gameTimeFrameString);
 
 	// TheSuperHackers @info this implicitly offsets the game timer from the right instead of left of the screen
-	int horizontalTimerOffset = TheDisplay->getWidth() - (Int)m_gameTimePosition.x - m_gameTimeString->getWidth() - m_gameTimeFrameString->getWidth();
-	int horizontalFrameOffset = TheDisplay->getWidth() - (Int)m_gameTimePosition.x - m_gameTimeFrameString->getWidth();
+	const Int anchorX = isAtHudAnchorPos(m_gameTimePosition) ? getHudAnchorX() : (Int)m_gameTimePosition.x;
+	const Int anchorY = isAtHudAnchorPos(m_gameTimePosition) ? getHudAnchorY() : (Int)m_gameTimePosition.y;
 
-	m_gameTimeString->draw(horizontalTimerOffset, m_gameTimePosition.y, m_gameTimeColor, m_gameTimeDropColor);
-	m_gameTimeFrameString->draw(horizontalFrameOffset, m_gameTimePosition.y, GameMakeColor(180,180,180,255), m_gameTimeDropColor);
+	int horizontalTimerOffset = TheDisplay->getWidth() - anchorX - m_gameTimeString->getWidth() - m_gameTimeFrameString->getWidth();
+	int horizontalFrameOffset = TheDisplay->getWidth() - anchorX - m_gameTimeFrameString->getWidth();
+
+	m_gameTimeString->draw(horizontalTimerOffset, anchorY, m_gameTimeColor, m_gameTimeDropColor);
+	m_gameTimeFrameString->draw(horizontalFrameOffset, anchorY, GameMakeColor(180,180,180,255), m_gameTimeDropColor);
 }
 
 void InGameUI::drawPlayerInfoList()
 {
-	const Int baseX = (Int)(m_playerInfoListPosition.x * TheDisplay->getWidth());
+	Int baseX = (Int)(m_playerInfoListPosition.x * TheDisplay->getWidth());
+	if (baseX == 0 && getHudAnchorX() > kHudDefaultAnchorX)
+	{
+		baseX = getHudAnchorX();
+	}
 	const Int baseY = (Int)(m_playerInfoListPosition.y * TheDisplay->getHeight());
 	const Int lineH = m_playerInfoList.labels[PlayerInfoList::LabelType_Team]->getFont()->height;
 	const Int columnGap = static_cast<Int>(lineH * (6.0f / 12.0f) + 0.5f);

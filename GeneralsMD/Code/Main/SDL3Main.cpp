@@ -543,48 +543,10 @@ int main(int argc, char* argv[])
 			// the engine's resolution-aware font scaling (GlobalLanguage).
 			int winW = 0, winH = 0;
 			SDL_GetWindowSizeInPixels(TheSDL3Window, &winW, &winH);
-			int ptW = 0, ptH = 0;
-			SDL_GetWindowSize(TheSDL3Window, &ptW, &ptH);
 			if (!userSetRes && winW > 0 && winH > 0 && winW > winH) {
 				int xres = winW;
-				int yres = winH;
-
-				const float aspect = (float)winW / (float)winH;
-				// GeneralsX @feature msudario 10/10/2026 Protect HUD and radar from rounded corners & Dynamic Island
-				// If widescreen iPhone (aspect > 1.85, e.g. 19.5:9), inset by safe margins so UI elements
-				// are not physically cut off by curved screen glass corners (~55pt radius) or Dynamic Island.
-				if (aspect > 1.85f && ptW > 0 && ptH > 0) {
-					SDL_Rect safeArea = { 0, 0, ptW, ptH };
-					SDL_GetWindowSafeArea(TheSDL3Window, &safeArea);
-
-					const float scaleX = (float)winW / (float)ptW;
-					const float scaleY = (float)winH / (float)ptH;
-
-					float leftInsetPt = (float)safeArea.x;
-					float rightInsetPt = (float)(ptW - (safeArea.x + safeArea.w));
-					float topInsetPt = (float)safeArea.y;
-					float bottomInsetPt = (float)(ptH - (safeArea.y + safeArea.h));
-
-					// iPhone physical curved corners have ~50-55pt radius.
-					// Ensure at least 48pt horizontal margin to clear curved corners & Dynamic Island,
-					// and 16pt vertical margin to clear top/bottom curved corners.
-					leftInsetPt = std::max(leftInsetPt, 48.0f);
-					rightInsetPt = std::max(rightInsetPt, 48.0f);
-					topInsetPt = std::max(topInsetPt, 16.0f);
-					bottomInsetPt = std::max(bottomInsetPt, 16.0f);
-
-					// Symmetric insets keep the game viewport centered
-					const int insetX = (int)(std::max(leftInsetPt, rightInsetPt) * scaleX);
-					const int insetY = (int)(std::max(topInsetPt, bottomInsetPt) * scaleY);
-
-					xres = winW - 2 * insetX;
-					yres = winH - 2 * insetY;
-					fprintf(stderr, "INFO: iOS widescreen safe area insets: insetX=%d, insetY=%d, gameRes=%dx%d (from window %dx%d)\n",
-					        insetX, insetY, xres, yres, winW, winH);
-				}
-
+				const int yres = winH;
 				xres &= ~1;  // keep it even
-				yres &= ~1;
 				static char xresVal[16], yresVal[16];
 				static char xresFlag[] = "-xres";
 				static char yresFlag[] = "-yres";
@@ -603,7 +565,7 @@ int main(int argc, char* argv[])
 				newArgv[n] = nullptr;
 				__argv = newArgv;
 				__argc = n;
-				fprintf(stderr, "INFO: iOS internal resolution set to %sx%s (window %dx%d)\n",
+				fprintf(stderr, "INFO: iOS fullscreen native resolution set to %sx%s (window %dx%d)\n",
 				        xresVal, yresVal, winW, winH);
 			}
 		}

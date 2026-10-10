@@ -195,19 +195,6 @@ bool DX8Wrapper::Pillarbox_Setup(int gameW, int gameH)
 	// Cache backbuffer size and compute aspect-correct fit rect once
 	s_bbW = bbW; s_bbH = bbH;
 	s_pixelDensity = density;
-#if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
-	// GeneralsX @feature msudario 10/10/2026 Center safe area game viewport 1:1 on iOS backbuffer without scaling
-	if (gameW <= bbW && gameH <= bbH) {
-		s_dstW = gameW;
-		s_dstH = gameH;
-		s_dstX = (bbW - gameW) / 2;
-		s_dstY = (bbH - gameH) / 2;
-		s_pillarboxEnabled = true;
-		fprintf(stderr, "INFO: iOS Safe Area Pillarbox: game=%dx%d, backbuffer=%dx%d, dst=[%d,%d,%d,%d]\n",
-			gameW, gameH, bbW, bbH, s_dstX, s_dstY, s_dstW, s_dstH);
-		return true;
-	}
-#endif
 	float gameAspect = (float)gameW / (float)gameH;
 	float bbAspect = (float)bbW / (float)bbH;
 	if (bbAspect > gameAspect) {
