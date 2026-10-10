@@ -80,9 +80,10 @@ if ([string]::IsNullOrWhiteSpace($GameDir)) {
         "C:\Program Files\EA Games\Command & Conquer Generals Zero Hour",
         "C:\Program Files (x86)\EA Games\Command & Conquer Generals Zero Hour",
         "C:\Program Files (x86)\Electronic Arts\Command & Conquer Generals Zero Hour",
-        "C:\Program Files (x86)\Origin Games\Command and Conquer Generals Zero Hour",
         "C:\Games\Command and Conquer Generals Zero Hour",
-        "D:\Games\Command and Conquer Generals Zero Hour"
+        "D:\Games\Command and Conquer Generals Zero Hour",
+        "E:\Project\Command.and.Conquer.Generals\Command and Conquer Generals Zero Hour",
+        "E:\Project\Command.and.Conquer.Generals"
     )
 
     foreach ($p in $searchPaths) {
