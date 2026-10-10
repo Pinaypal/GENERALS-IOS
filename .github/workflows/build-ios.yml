@@ -130,7 +130,10 @@ jobs:
 
       - name: Package Unsigned iOS IPA
         run: |
-          BUNDLE_ID="${{ inputs.bundle_id || 'com.cnc.generalszh' }}"
+          BUNDLE_ID="${{ github.event.inputs.bundle_id }}"
+          if [ -z "$BUNDLE_ID" ]; then
+            BUNDLE_ID="com.cnc.generalszh"
+          fi
           echo "Packaging Generals Zero Hour IPA with bundle ID: $BUNDLE_ID"
           GX_BUNDLE_ID="$BUNDLE_ID" ./scripts/build/ios/package-ios-zh.sh --dev --unsigned --ipa
           ls -lh build/GeneralsXZH-unsigned.ipa
@@ -142,12 +145,21 @@ jobs:
           path: build/GeneralsXZH-unsigned.ipa
           retention-days: 7
 
+      - name: Determine Release Tag
+        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.create_release == 'true'
+        run: |
+          TAG="${{ github.ref_name }}"
+          if [ "$TAG" = "main" ] || [ -z "$TAG" ]; then
+            TAG="v1.0.4-ios"
+          fi
+          echo "RELEASE_TAG=$TAG" >> $GITHUB_ENV
+
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v') || inputs.create_release == true
+        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.create_release == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name || 'v1.0.4-ios' }}
-          name: Command & Conquer: Generals Zero Hour iOS - Shell IPA (${{ github.ref_name || 'v1.0.4' }})
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Command & Conquer: Generals Zero Hour iOS - Shell IPA (${{ env.RELEASE_TAG }})
           body: |
             ### Command & Conquer: Generals Zero Hour — iOS Shell IPA (Unsigned)
             
