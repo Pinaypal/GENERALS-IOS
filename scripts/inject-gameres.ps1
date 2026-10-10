@@ -106,6 +106,13 @@ if ([string]::IsNullOrWhiteSpace($GameDir) -or -not (Test-Path $GameDir)) {
     $GameDir = $entered.Trim('"').Trim("'")
 }
 
+# Auto-resolve Zero Hour subfolder if parent directory was provided
+if (Test-Path (Join-Path $GameDir "Command and Conquer Generals Zero Hour")) {
+    $GameDir = Join-Path $GameDir "Command and Conquer Generals Zero Hour"
+} elseif (Test-Path (Join-Path $GameDir "Command & Conquer Generals - Zero Hour")) {
+    $GameDir = Join-Path $GameDir "Command & Conquer Generals - Zero Hour"
+}
+
 Write-Host "--> Retail Game Source: $GameDir" -ForegroundColor Green
 
 # 3. Verify core files

@@ -60,6 +60,13 @@ if ([string]::IsNullOrWhiteSpace($GameDir) -or -not (Test-Path $GameDir)) {
     exit 1
 }
 
+# Auto-resolve Zero Hour subfolder if parent directory was provided
+if (Test-Path (Join-Path $GameDir "Command and Conquer Generals Zero Hour")) {
+    $GameDir = Join-Path $GameDir "Command and Conquer Generals Zero Hour"
+} elseif (Test-Path (Join-Path $GameDir "Command & Conquer Generals - Zero Hour")) {
+    $GameDir = Join-Path $GameDir "Command & Conquer Generals - Zero Hour"
+}
+
 Write-Host "--> Source: $GameDir" -ForegroundColor Green
 Write-Host "--> Destination: $TargetExport" -ForegroundColor Green
 
