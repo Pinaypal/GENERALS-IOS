@@ -735,9 +735,10 @@ void GameEngine::init()
 		{
 			TheWritableGlobalData->m_framesPerSecondLimit = BaseFps;
 		}
-#endif
-
 		TheFramePacer->setFramesPerSecondLimit(TheGlobalData->m_framesPerSecondLimit);
+		// GeneralsX @bugfix msudario 10/10/2026 Ensure logic time scale is decoupled from render FPS
+		TheFramePacer->setLogicTimeScaleFps(LOGICFRAMES_PER_SECOND);
+		TheFramePacer->enableLogicTimeScale(LOGICFRAMES_PER_SECOND < TheGlobalData->m_framesPerSecondLimit);
 
 		TheAudio->setOn(TheGlobalData->m_audioOn && TheGlobalData->m_musicOn, AudioAffect_Music);
 		TheAudio->setOn(TheGlobalData->m_audioOn && TheGlobalData->m_soundsOn, AudioAffect_Sound);
@@ -927,7 +928,8 @@ Bool GameEngine::canUpdateNetworkGameLogic()
 /// -----------------------------------------------------------------------------------------------
 Bool GameEngine::canUpdateRegularGameLogic()
 {
-	const Bool enabled = TheFramePacer->isLogicTimeScaleEnabled();
+	// GeneralsX @bugfix msudario 10/10/2026 Prevent fast-forward speed when logic FPS is decoupled from render FPS
+	const Bool enabled = TheFramePacer->isLogicTimeScaleEnabled() || (TheFramePacer->getLogicTimeScaleFps() < TheFramePacer->getFramesPerSecondLimit());
 	const Int logicTimeScaleFps = TheFramePacer->getLogicTimeScaleFps();
 	const Int maxRenderFps = TheFramePacer->getFramesPerSecondLimit();
 

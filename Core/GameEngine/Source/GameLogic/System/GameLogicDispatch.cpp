@@ -887,13 +887,31 @@ bool GameLogic::onNewGame(MAYBE_UNUSED GameMessage *msg)
 	if ( msg->getArgumentCount() >= 3 )
 		rankPoints = msg->getArgument( 2 )->integer;
 
+	// GeneralsX @bugfix msudario 10/10/2026 Set simulation game speed from Skirmish/options while preserving high-refresh render FPS
 	if ( msg->getArgumentCount() >= 4 )
 	{
-		Int maxFPS = msg->getArgument( 3 )->integer;
-		if (maxFPS < 1 || maxFPS > 1000)
-			maxFPS = TheGlobalData->m_framesPerSecondLimit;
-		DEBUG_LOG(("Setting max FPS limit to %d FPS", maxFPS));
-		TheFramePacer->setFramesPerSecondLimit(maxFPS);
+		Int gameSpeed = msg->getArgument( 3 )->integer;
+		if (gameSpeed < 15 || gameSpeed > 1000)
+			gameSpeed = LOGICFRAMES_PER_SECOND;
+		DEBUG_LOG(("Setting game speed to %d FPS", gameSpeed));
+		if (gameSpeed > 60)
+		{
+			TheFramePacer->setLogicTimeScaleFps(TheFramePacer->getFramesPerSecondLimit());
+			TheFramePacer->enableLogicTimeScale(false);
+		}
+		else
+		{
+			TheFramePacer->setLogicTimeScaleFps(gameSpeed);
+			TheFramePacer->enableLogicTimeScale(gameSpeed < TheFramePacer->getFramesPerSecondLimit());
+		}
+		TheFramePacer->setFramesPerSecondLimit(TheGlobalData->m_framesPerSecondLimit);
+		TheWritableGlobalData->m_useFpsLimit = true;
+	}
+	else
+	{
+		TheFramePacer->setLogicTimeScaleFps(LOGICFRAMES_PER_SECOND);
+		TheFramePacer->enableLogicTimeScale(LOGICFRAMES_PER_SECOND < TheFramePacer->getFramesPerSecondLimit());
+		TheFramePacer->setFramesPerSecondLimit(TheGlobalData->m_framesPerSecondLimit);
 		TheWritableGlobalData->m_useFpsLimit = true;
 	}
 

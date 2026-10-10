@@ -42,7 +42,8 @@ FramePacer::FramePacer()
 	m_logicTimeScaleFPS = LOGICFRAMES_PER_SECOND;
 	m_updateTime = 1.0f / (Real)BaseFps; // initialized to something to avoid division by zero on first use
 	m_enableFpsLimit = FALSE;
-	m_enableLogicTimeScale = FALSE;
+	// GeneralsX @bugfix msudario 10/10/2026 Decouple simulation logic tick rate (30 FPS) from high refresh render frame rate
+	m_enableLogicTimeScale = TRUE;
 	m_isTimeFrozen = FALSE;
 	m_isGameHalted = FALSE;
 }
@@ -68,6 +69,8 @@ void FramePacer::setFramesPerSecondLimit( Int fps )
 {
 	DEBUG_LOG(("FramePacer::setFramesPerSecondLimit() - setting max fps to %d (TheGlobalData->m_useFpsLimit == %d)", fps, TheGlobalData->m_useFpsLimit));
 	m_maxFPS = fps;
+	// GeneralsX @bugfix msudario 10/10/2026 Decouple logic frame rate from high refresh render FPS to prevent fast-forward speed
+	enableLogicTimeScale(m_logicTimeScaleFPS < m_maxFPS);
 }
 
 Int FramePacer::getFramesPerSecondLimit()  const
@@ -154,6 +157,8 @@ Bool FramePacer::isGameHalted() const
 void FramePacer::setLogicTimeScaleFps( Int fps )
 {
 	m_logicTimeScaleFPS = fps;
+	// GeneralsX @bugfix msudario 10/10/2026 Decouple logic frame rate from high refresh render FPS to prevent fast-forward speed
+	enableLogicTimeScale(m_logicTimeScaleFPS < m_maxFPS);
 }
 
 Int FramePacer::getLogicTimeScaleFps() const
