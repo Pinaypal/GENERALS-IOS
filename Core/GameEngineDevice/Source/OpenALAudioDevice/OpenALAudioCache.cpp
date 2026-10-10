@@ -15,7 +15,7 @@ extern "C" {
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-OpenALAudioFileCache::OpenALAudioFileCache() : m_maxSize(14*1024*1024), m_currentlyUsedSize(0)
+OpenALAudioFileCache::OpenALAudioFileCache() : m_maxSize(32*1024*1024), m_currentlyUsedSize(0)
 {
 }
 
@@ -160,7 +160,11 @@ ALuint OpenALAudioFileCache::getBufferForFile(const OpenFileInfo &fileInfo)
 
 	openedAudioFile.m_ffmpegFile->close();
 
-	openedAudioFile.m_fileSize = fileSize;
+	// GeneralsX @performance msudario 10/10/2026 Keep true uncompressed decoded PCM byte size
+	// so m_currentlyUsedSize reflects real memory usage and triggers eviction properly.
+	if (openedAudioFile.m_fileSize == 0) {
+		openedAudioFile.m_fileSize = fileSize;
+	}
 	m_currentlyUsedSize += openedAudioFile.m_fileSize;
 	if (m_currentlyUsedSize > m_maxSize) {
 		DEBUG_LOG(("Audio Cache is full, trying to free some space\n"));
@@ -307,4 +311,29 @@ Bool OpenALAudioFileCache::freeEnoughSpaceForSample(const OpenAudioFile& sampleT
 	}
 
 	return TRUE;
+}
+
+// GeneralsX @performance msudario 10/10/2026 Purge unreferenced audio buffers (openCount == 0) to free memory
+void OpenALAudioFileCache::purgeUnusedBuffers(UnsignedInt targetBytesToKeep)
+{
+	std::list<AsciiString> filesToClose;
+	for (OpenFilesHashIt it = m_openFiles.begin(); it != m_openFiles.end(); ++it) {
+		if (it->second.m_openCount == 0) {
+			filesToClose.push_back(it->first);
+		}
+	}
+
+	for (const auto& name : filesToClose) {
+		OpenFilesHashIt itToErase = m_openFiles.find(name);
+		if (itToErase != m_openFiles.end()) {
+			const UnsignedInt sz = itToErase->second.m_fileSize;
+			releaseOpenAudioFile(&itToErase->second);
+			if (m_currentlyUsedSize >= sz) {
+				m_currentlyUsedSize -= sz;
+			} else {
+				m_currentlyUsedSize = 0;
+			}
+			m_openFiles.erase(itToErase);
+		}
+	}
 }

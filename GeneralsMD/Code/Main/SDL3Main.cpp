@@ -566,6 +566,40 @@ int main(int argc, char* argv[])
 				        xresVal, yresVal, winW, winH);
 			}
 		}
+
+		// GeneralsX @feature msudario 10/10/2026 Auto-detect ProMotion 120Hz display refresh rate on iOS
+		{
+			bool userSetFps = false;
+			for (int i = 1; i < __argc; ++i) {
+				if (strcmp(__argv[i], "-fps") == 0) {
+					userSetFps = true;
+					break;
+				}
+			}
+			if (!userSetFps && TheSDL3Window) {
+				const SDL_DisplayID displayID = SDL_GetDisplayForWindow(TheSDL3Window);
+				const SDL_DisplayMode *mode = SDL_GetCurrentDisplayMode(displayID);
+				int targetFps = 120;
+				if (mode && mode->refresh_rate > 30.0f) {
+					targetFps = (int)(mode->refresh_rate + 0.5f);
+				}
+				static char fpsVal[16];
+				static char fpsFlag[] = "-fps";
+				snprintf(fpsVal, sizeof(fpsVal), "%d", targetFps);
+
+				static char* fpsArgv[68];
+				int n = 0;
+				for (int i = 0; i < __argc && n < 64; ++i) {
+					fpsArgv[n++] = __argv[i];
+				}
+				fpsArgv[n++] = fpsFlag;
+				fpsArgv[n++] = fpsVal;
+				fpsArgv[n] = nullptr;
+				__argv = fpsArgv;
+				__argc = n;
+				fprintf(stderr, "INFO: iOS ProMotion display refresh target set to %s FPS\n", fpsVal);
+			}
+		}
 #endif
 		}
 

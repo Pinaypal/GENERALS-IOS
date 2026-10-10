@@ -102,6 +102,8 @@ public:
 	void closeBuffer(ALuint bufferToClose);
 	void setMaxSize(UnsignedInt size);
 	float getBufferLength(ALuint handle);
+	// GeneralsX @performance msudario 10/10/2026 Free unreferenced OpenAL buffers (openCount == 0) to prevent memory accumulation.
+	void purgeUnusedBuffers(UnsignedInt targetBytesToKeep = 0);
 	// End Protected by mutex
 
 	// Note: These functions should be used for informational purposes only. For speed reasons,

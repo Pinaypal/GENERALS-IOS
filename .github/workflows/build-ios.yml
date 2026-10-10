@@ -46,6 +46,7 @@ jobs:
       - name: Install Build Tools
         run: |
           echo "Installing iOS build prerequisites..."
+          echo "/opt/homebrew/bin" >> $GITHUB_PATH
           brew update
           brew install cmake ninja meson pkg-config autoconf autoconf-archive automake libtool glslang xcodegen sdl3
           cmake --version | head -1
@@ -95,6 +96,13 @@ jobs:
         with:
           vcpkgGitCommitId: 'ffc071e0c08432c60c9b64f00334c0227667931b'
 
+      - name: Unshallow vcpkg for versioning
+        run: |
+          if [ -d "$VCPKG_ROOT/.git" ]; then
+            echo "Unshallowing vcpkg repository for manifest version resolution..."
+            git -C "$VCPKG_ROOT" fetch --unshallow || true
+          fi
+
       - name: Fetch Dynamic MoltenVK & Stage Fonts
         run: |
           chmod +x scripts/build/ios/*.sh
@@ -103,7 +111,9 @@ jobs:
 
       - name: Configure CMake (ios-vulkan preset)
         run: |
-          cmake --preset ios-vulkan
+          NINJA_BIN=$(which ninja || echo "/opt/homebrew/bin/ninja")
+          echo "Using ninja at: $NINJA_BIN"
+          cmake --preset ios-vulkan -DCMAKE_MAKE_PROGRAM="$NINJA_BIN"
 
       - name: Compile Generals Zero Hour Engine
         run: |

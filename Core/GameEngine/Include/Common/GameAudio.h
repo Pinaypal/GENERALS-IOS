@@ -295,6 +295,9 @@ class AudioManager : public SubsystemInterface
 		// For the file cache to know when to remove files.
 		virtual void closeAnySamplesUsingFile( const void *fileToClose ) = 0;
 
+		// GeneralsX @performance msudario 10/10/2026 Purge unreferenced cached audio samples to reclaim memory under pressure.
+		virtual void flushUnusedAudioBuffers() {}
+
 		virtual Bool isMusicAlreadyLoaded() const;
 
 		Bool getDisallowSpeech() const { return m_disallowSpeech; }

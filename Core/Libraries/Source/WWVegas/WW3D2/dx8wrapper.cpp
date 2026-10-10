@@ -2041,6 +2041,12 @@ void DX8Wrapper::End_Scene(bool flip_frames)
 
 	if (flip_frames) {
 		DX8_Assert();
+#if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
+		// GeneralsX @bugfix msudario 10/10/2026 Never present to a suspended/inactive CAMetalLayer
+		if (IOS_ShouldPauseRendering()) {
+			return;
+		}
+#endif
 		HRESULT hr;
 		{
 			WWPROFILE("DX8Device::Present()");
@@ -2064,6 +2070,12 @@ void DX8Wrapper::End_Scene(bool flip_frames)
 
 		// If the device was lost we need to check for cooperative level and possibly reset the device
 		if (hr==D3DERR_DEVICELOST) {
+#if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
+			// GeneralsX @bugfix msudario 10/10/2026 On iOS, do NOT call Reset_Device() while inactive/backgrounded
+			if (IOS_ShouldPauseRendering()) {
+				return;
+			}
+#endif
 			hr=_Get_D3D_Device8()->TestCooperativeLevel();
 			if (hr==D3DERR_DEVICENOTRESET) {
 				WWDEBUG_SAY(("DX8Wrapper::End_Scene is resetting the device."));
@@ -2094,6 +2106,12 @@ void DX8Wrapper::Flip_To_Primary()
 	// chain is the one visible.
 	if (!IsWindowed) {
 		DX8_Assert();
+
+#if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
+		if (IOS_ShouldPauseRendering()) {
+			return;
+		}
+#endif
 
 		int numBuffers = (_PresentParameters.BackBufferCount + 1);
 		int visibleBuffer = (FrameCount % numBuffers);

@@ -152,6 +152,7 @@ public:
 	virtual Real getFileLengthMS(AsciiString strToLoad) const;
 
 	virtual void closeAnySamplesUsingFile(const void *fileToClose) override;
+	virtual void flushUnusedAudioBuffers() override;
 
 	virtual Bool has3DSensitiveStreamsPlaying(void) const;
 

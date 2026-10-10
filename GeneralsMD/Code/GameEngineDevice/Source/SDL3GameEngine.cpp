@@ -86,12 +86,26 @@ extern GameWindowManager *TheWindowManager;
 // repeated suspend/switcher cycles MoltenVK is driven into an unrecoverable
 // surface state and the app crashes (the reported "crashes after backgrounding /
 // multitasking a few times"). Pause whenever either is set.
+#if defined(__APPLE__)
+extern "C" void* objc_autoreleasePoolPush(void);
+extern "C" void objc_autoreleasePoolPop(void* context);
+#endif
+
+#if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
 static std::atomic<bool> s_appBackgrounded{false};
 static std::atomic<bool> s_appInactive{false};
+static std::mutex s_renderLifecycleMutex;
+
+// GeneralsX @bugfix msudario 10/10/2026 Exported check for dx8wrapper.cpp to skip Present/Reset when backgrounded
+bool IOS_ShouldPauseRendering()
+{
+	return s_appBackgrounded.load(std::memory_order_relaxed) ||
+	       s_appInactive.load(std::memory_order_relaxed);
+}
 
 static inline bool iosShouldPauseRendering()
 {
-	return s_appBackgrounded.load() || s_appInactive.load();
+	return IOS_ShouldPauseRendering();
 }
 
 static bool SDLCALL iosLifecycleWatcher(void *userdata, SDL_Event *event)
@@ -99,26 +113,31 @@ static bool SDLCALL iosLifecycleWatcher(void *userdata, SDL_Event *event)
 	switch (event->type) {
 		case SDL_EVENT_WILL_ENTER_BACKGROUND:
 		case SDL_EVENT_DID_ENTER_BACKGROUND:
-			s_appBackgrounded.store(true);
+			s_appBackgrounded.store(true, std::memory_order_release);
+			{
+				// GeneralsX @bugfix msudario 10/10/2026 Wait for in-flight frame render to complete before process suspension
+				std::lock_guard<std::mutex> lock(s_renderLifecycleMutex);
+			}
 			break;
 		case SDL_EVENT_DID_ENTER_FOREGROUND:
-			s_appBackgrounded.store(false);
+			s_appBackgrounded.store(false, std::memory_order_release);
 			break;
 		// Resign/become active. On iOS, SDL maps applicationWillResignActive ->
 		// window focus lost and applicationDidBecomeActive -> window focus gained.
 		// Stay paused until fully active again (focus regained), which arrives
 		// after DID_ENTER_FOREGROUND.
 		case SDL_EVENT_WINDOW_FOCUS_LOST:
-			s_appInactive.store(true);
+			s_appInactive.store(true, std::memory_order_release);
 			break;
 		case SDL_EVENT_WINDOW_FOCUS_GAINED:
-			s_appInactive.store(false);
+			s_appInactive.store(false, std::memory_order_release);
 			break;
 		default:
 			break;
 	}
 	return true;
 }
+#endif
 
 // ---------------------------------------------------------------------------
 // iOS touch -> mouse gesture translation
@@ -349,6 +368,21 @@ void handleTouchEvent(SDL3Mouse *mouse, SDL_Window *window, const SDL_Event &eve
 	}
 }
 
+// GeneralsX @bugfix msudario 10/10/2026 Reset stuck touch gestures when focus is lost or backgrounded
+void resetTouchState(SDL3Mouse *mouse, SDL_Window *window)
+{
+	if (mouse && window) {
+		if (s_touch.phase == TouchState::DRAGGING) {
+			sendSyntheticMouse(mouse, window, SDL_EVENT_MOUSE_BUTTON_UP,
+			                   s_touch.lastX, s_touch.lastY, SDL_BUTTON_LEFT);
+		} else if (s_touch.phase == TouchState::PAN) {
+			sendSyntheticMouse(mouse, window, SDL_EVENT_MOUSE_BUTTON_UP,
+			                   s_touch.panX, s_touch.panY, SDL_BUTTON_RIGHT);
+		}
+	}
+	s_touch = TouchState();
+}
+
 // Called once per engine frame (not just per touch event): a perfectly
 // stationary finger produces no SDL events, so the long-press timer must be
 // polled from the frame loop or it would never fire.
@@ -525,6 +559,13 @@ void SDL3GameEngine::reset(void)
  */
 void SDL3GameEngine::update(void)
 {
+#if defined(__APPLE__)
+	// GeneralsX @performance msudario 10/10/2026 Drain autoreleased Cocoa/Metal objects each frame.
+	// In tight C++ loops that don't return to CFRunLoop, undrained autorelease pools cause
+	// resident memory to grow to ~3 GB+ over long iPad sessions until iOS Jetsam terminates the process.
+	void *autoReleasePool = objc_autoreleasePoolPush();
+#endif
+
 	pollSDL3Events();
 #if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
 	// Pause sim + render while backgrounded OR inactive (see iosLifecycleWatcher).
@@ -532,11 +573,36 @@ void SDL3GameEngine::update(void)
 	// across repeated suspend/switcher cycles, crashes MoltenVK. Keep polling so
 	// we still catch the resume events; just don't touch the GPU.
 	if (iosShouldPauseRendering()) {
+#if defined(__APPLE__)
+		if (autoReleasePool) {
+			objc_autoreleasePoolPop(autoReleasePool);
+		}
+#endif
 		SDL_Delay(50);
 		return;
 	}
 #endif
-	GameEngine::update();
+
+	{
+#if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
+		std::lock_guard<std::mutex> renderLock(s_renderLifecycleMutex);
+		if (iosShouldPauseRendering()) {
+#if defined(__APPLE__)
+			if (autoReleasePool) {
+				objc_autoreleasePoolPop(autoReleasePool);
+			}
+#endif
+			return;
+		}
+#endif
+		GameEngine::update();
+	}
+
+#if defined(__APPLE__)
+	if (autoReleasePool) {
+		objc_autoreleasePoolPop(autoReleasePool);
+	}
+#endif
 }
 
 /**
@@ -613,6 +679,12 @@ void SDL3GameEngine::pollSDL3Events(void)
 					m_TextInputFocusWindow = nullptr;
 				}
 				if (TheMouse) {
+#if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
+					SDL3Mouse* mouse = dynamic_cast<SDL3Mouse*>(TheMouse);
+					if (mouse && m_SDLWindow) {
+						resetTouchState(mouse, m_SDLWindow);
+					}
+#endif
 					TheMouse->loseFocus();
 				}
 				break;
@@ -623,7 +695,14 @@ void SDL3GameEngine::pollSDL3Events(void)
 			case SDL_EVENT_DID_ENTER_BACKGROUND:
 				m_IsActive = false;
 				if (TheMouse) {
+					SDL3Mouse* mouse = dynamic_cast<SDL3Mouse*>(TheMouse);
+					if (mouse && m_SDLWindow) {
+						resetTouchState(mouse, m_SDLWindow);
+					}
 					TheMouse->loseFocus();
+				}
+				if (TheAudio) {
+					TheAudio->flushUnusedAudioBuffers();
 				}
 				break;
 
@@ -632,6 +711,13 @@ void SDL3GameEngine::pollSDL3Events(void)
 				if (TheMouse) {
 					TheMouse->regainFocus();
 					TheMouse->refreshCursorCapture();
+				}
+				break;
+
+			case SDL_EVENT_LOW_MEMORY:
+				fprintf(stderr, "WARNING: iOS Low Memory Warning (SDL_EVENT_LOW_MEMORY) received! Purging audio and texture caches...\n");
+				if (TheAudio) {
+					TheAudio->flushUnusedAudioBuffers();
 				}
 				break;
 #endif

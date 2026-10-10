@@ -1172,6 +1172,7 @@ static CommandLineParam paramsForEngineInit[] =
 	{ "-noShellAnim", parseNoWindowAnimation }, // TheSuperHackers @tweak Is now available in Release builds.
 	{ "-xres", parseXRes },
 	{ "-yres", parseYRes },
+	{ "-fps", parseFPSLimit }, // GeneralsX @feature msudario 10/10/2026 Allow -fps in Release builds (ProMotion 120Hz support)
 	{ "-fullVersion", parseFullVersion },
 	{ "-particleEdit", parseParticleEdit },
 	{ "-scriptDebug", parseScriptDebug },

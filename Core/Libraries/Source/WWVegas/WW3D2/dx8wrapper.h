@@ -43,6 +43,13 @@
 
 #include "always.h"
 #include "dllist.h"
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+#if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
+// GeneralsX @bugfix msudario 10/10/2026 Check if iOS lifecycle has paused rendering before Present/Reset calls
+extern bool IOS_ShouldPauseRendering();
+#endif
 // GeneralsX @build BenderAI 10/02/2026
 // Use angle brackets (not quotes) to skip local d3d8.h stub and get DXVK headers
 // DXVK's d3d8.h includes d3d8types.h internally - no manual includes needed

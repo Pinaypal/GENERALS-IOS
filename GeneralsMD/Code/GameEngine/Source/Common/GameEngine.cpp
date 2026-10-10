@@ -724,10 +724,18 @@ void GameEngine::init()
 		TheSubsystemList->postProcessLoadAll();
 
 		// GeneralsX @bugfix Copilot 11/05/2026 Prevent uncapped render when FPS limiter is enabled but no valid limit value was loaded.
+#if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
+		// GeneralsX @feature msudario 10/10/2026 On iOS/iPadOS default to 120 FPS for ProMotion high refresh displays
+		if (TheGlobalData->m_framesPerSecondLimit <= 0)
+		{
+			TheWritableGlobalData->m_framesPerSecondLimit = 120;
+		}
+#else
 		if (TheGlobalData->m_useFpsLimit && TheGlobalData->m_framesPerSecondLimit <= 0)
 		{
 			TheWritableGlobalData->m_framesPerSecondLimit = BaseFps;
 		}
+#endif
 
 		TheFramePacer->setFramesPerSecondLimit(TheGlobalData->m_framesPerSecondLimit);
 

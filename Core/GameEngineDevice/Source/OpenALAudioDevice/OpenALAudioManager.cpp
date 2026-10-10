@@ -2831,6 +2831,14 @@ void OpenALAudioManager::closeAnySamplesUsingFile(const void* fileToClose)
 	}
 }
 
+// GeneralsX @performance msudario 10/10/2026 Flush unreferenced audio buffers under memory pressure
+void OpenALAudioManager::flushUnusedAudioBuffers()
+{
+	if (m_audioCache) {
+		m_audioCache->purgeUnusedBuffers();
+	}
+}
+
 //-------------------------------------------------------------------------------------------------
 void OpenALAudioManager::setDeviceListenerPosition(void)
 {

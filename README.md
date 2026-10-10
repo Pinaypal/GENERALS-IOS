@@ -169,13 +169,11 @@ Assets can ship directly inside the app bundle (self-contained install); `--dev`
 | `ios/` | XcodeGen signing-stub project + `ios/config/` (staged Options.ini, dxvk.conf) |
 | `Patches/dxvk-ios.patch` | DXVK changes the iOS d3d8/d3d9 dylibs are built from (applied via the local-fork build) |
 
-## Known issues
+## Resolved iOS Optimizations & Known Issues
 
-- Long sessions on iPad can be killed by iOS for memory (~3 GB+ resident); the app
-  exits to the home screen with no dialog. Session logs (current + previous) are in
-  the Files app under the game's folder. Under investigation.
-- Backgrounding mid-game can occasionally crash on iOS — the lifecycle pause covers
-  the common paths; a rare race remains. Save often.
+- **Long sessions memory management (Resolved)**: Wrapped the main render/sim loop with per-frame Objective-C/Metal autorelease pool drainage (`objc_autoreleasePoolPush` / `objc_autoreleasePoolPop`), corrected OpenAL audio cache accounting to track true uncompressed PCM byte sizes rather than compressed disk sizes (capping PCM cache to 32 MB with LRU eviction), hooked iOS low-memory warnings (`SDL_EVENT_LOW_MEMORY`) to purge unreferenced samples, and constrained DXVK memory chunk sizes to 64 MB.
+- **Backgrounding lifecycle race condition (Resolved)**: Added a rendering lifecycle mutex (`s_renderLifecycleMutex`) synchronizing `iosLifecycleWatcher` and the frame loop so suspension waits for in-flight frames, guarded `DX8Wrapper::End_Scene` and `Flip_To_Primary` against presenting to suspended CAMetalLayers, and reset touch gesture state on focus loss.
+- **ProMotion 120Hz support (Added)**: Enabled `CADisableMinimumFrameDuration` and `CADisableMinimumFrameDurationOnPhone` in Info.plist, configured DXVK `maxFrameRate = 120` and `maxFrameLatency = 1`, and dynamically detect ProMotion display refresh rates via SDL3 display modes while preserving deterministic 30 FPS logic simulation.
 
 ## What's next: Renegade 👀
 
