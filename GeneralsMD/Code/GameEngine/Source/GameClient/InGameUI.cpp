@@ -959,6 +959,11 @@ void INI::parseInGameUIDefinition( INI* ini )
 }
 
 //-------------------------------------------------------------------------------------------------
+#if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
+#include <SDL3/SDL.h>
+extern SDL_Window* TheSDL3Window;
+#endif
+
 namespace
 {
 	// helpers for inline counters
@@ -970,6 +975,22 @@ namespace
 	{
 		if (TheDisplay)
 		{
+#if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
+			if (TheSDL3Window)
+			{
+				SDL_Rect safeArea;
+				if (SDL_GetWindowSafeArea(TheSDL3Window, &safeArea))
+				{
+					int winW = 0, winH = 0;
+					SDL_GetWindowSizeInPixels(TheSDL3Window, &winW, &winH);
+					if (safeArea.x > 0 && winW > 0)
+					{
+						const float scale = (float)TheDisplay->getWidth() / (float)winW;
+						return static_cast<Int>(safeArea.x * scale);
+					}
+				}
+			}
+#endif
 			const Int w = TheDisplay->getWidth();
 			const Int h = TheDisplay->getHeight();
 			if (h > 0 && ((float)w / (float)h) > 1.85f)
@@ -981,10 +1002,57 @@ namespace
 		return kHudDefaultAnchorX;
 	}
 
+	inline Int getHudAnchorRightX()
+	{
+		if (TheDisplay)
+		{
+#if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
+			if (TheSDL3Window)
+			{
+				SDL_Rect safeArea;
+				if (SDL_GetWindowSafeArea(TheSDL3Window, &safeArea))
+				{
+					int winW = 0, winH = 0;
+					SDL_GetWindowSizeInPixels(TheSDL3Window, &winW, &winH);
+					const int rightInset = winW - (safeArea.x + safeArea.w);
+					if (rightInset > 0 && winW > 0)
+					{
+						const float scale = (float)TheDisplay->getWidth() / (float)winW;
+						return static_cast<Int>(rightInset * scale);
+					}
+				}
+			}
+#endif
+			const Int w = TheDisplay->getWidth();
+			const Int h = TheDisplay->getHeight();
+			if (h > 0 && ((float)w / (float)h) > 1.85f)
+			{
+				return static_cast<Int>(h * (56.0f / 393.0f));
+			}
+		}
+		return kHudDefaultAnchorX;
+	}
+
 	inline Int getHudAnchorY()
 	{
 		if (TheDisplay)
 		{
+#if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
+			if (TheSDL3Window)
+			{
+				SDL_Rect safeArea;
+				if (SDL_GetWindowSafeArea(TheSDL3Window, &safeArea))
+				{
+					int winW = 0, winH = 0;
+					SDL_GetWindowSizeInPixels(TheSDL3Window, &winW, &winH);
+					if (safeArea.y > 0 && winH > 0)
+					{
+						const float scale = (float)TheDisplay->getHeight() / (float)winH;
+						return static_cast<Int>(safeArea.y * scale);
+					}
+				}
+			}
+#endif
 			const Int w = TheDisplay->getWidth();
 			const Int h = TheDisplay->getHeight();
 			if (h > 0 && ((float)w / (float)h) > 1.85f)
@@ -3814,6 +3882,13 @@ void InGameUI::postWindowDraw()
 		drawGameTime();
 	}
 
+#if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
+	if (TheGameLogic->isInGame() && !TheGameLogic->isInShellGame())
+	{
+		drawMobileActionDock();
+	}
+#endif
+
 	if (m_playerInfoListPointSize > 0 && TheGameLogic->isInGame() && TheControlBar->isObserverControlBarOn())
 	{
 		drawPlayerInfoList();
@@ -6304,11 +6379,11 @@ void InGameUI::drawGameTime()
     m_gameTimeFrameString->setText(gameTimeFrameString);
 
 	// TheSuperHackers @info this implicitly offsets the game timer from the right instead of left of the screen
-	const Int anchorX = isAtHudAnchorPos(m_gameTimePosition) ? getHudAnchorX() : (Int)m_gameTimePosition.x;
+	const Int anchorRightX = isAtHudAnchorPos(m_gameTimePosition) ? getHudAnchorRightX() : (Int)m_gameTimePosition.x;
 	const Int anchorY = isAtHudAnchorPos(m_gameTimePosition) ? getHudAnchorY() : (Int)m_gameTimePosition.y;
 
-	int horizontalTimerOffset = TheDisplay->getWidth() - anchorX - m_gameTimeString->getWidth() - m_gameTimeFrameString->getWidth();
-	int horizontalFrameOffset = TheDisplay->getWidth() - anchorX - m_gameTimeFrameString->getWidth();
+	int horizontalTimerOffset = TheDisplay->getWidth() - anchorRightX - m_gameTimeString->getWidth() - m_gameTimeFrameString->getWidth();
+	int horizontalFrameOffset = TheDisplay->getWidth() - anchorRightX - m_gameTimeFrameString->getWidth();
 
 	m_gameTimeString->draw(horizontalTimerOffset, anchorY, m_gameTimeColor, m_gameTimeDropColor);
 	m_gameTimeFrameString->draw(horizontalFrameOffset, anchorY, GameMakeColor(180,180,180,255), m_gameTimeDropColor);
@@ -6404,3 +6479,177 @@ void InGameUI::drawPlayerInfoList()
 		drawY += lineH;
 	}
 }
+
+#if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
+namespace {
+	struct MobileDockButtonDef {
+		const char *label;
+		Int actionType; // 0 = toggle, 1 = ALL, 2 = STOP, 3 = SCAT, 4 = RADR, 5 = HOME, 6-9 = G1-G4
+	};
+
+	static bool s_dockExpanded = false;
+	static Int s_highlightedButton = -1;
+	static UnsignedInt s_buttonDownTime = 0;
+
+	static const MobileDockButtonDef s_dockButtons[] = {
+		{ "[+]",  0 },
+		{ "ALL",  1 },
+		{ "STOP", 2 },
+		{ "SCAT", 3 },
+		{ "RADR", 4 },
+		{ "HOME", 5 },
+		{ "G1",   6 },
+		{ "G2",   7 },
+		{ "G3",   8 },
+		{ "G4",   9 }
+	};
+	static const int s_numDockButtons = 10;
+	static DisplayString *s_dockStrings[s_numDockButtons] = { nullptr };
+}
+
+void InGameUI::drawMobileActionDock()
+{
+	if (!TheDisplay || !TheWindowManager || !TheDisplayStringManager)
+		return;
+
+	const Int btnW = 44;
+	const Int btnH = 32;
+	const Int spacing = 4;
+	const Int startX = getHudAnchorX() + 4;
+	const Int startY = 110;
+
+	// Lazy initialize display strings
+	if (!s_dockStrings[0])
+	{
+		GameFont *dockFont = TheWindowManager->winFindFont("Arial", 10, TRUE);
+		for (int i = 0; i < s_numDockButtons; ++i)
+		{
+			s_dockStrings[i] = TheDisplayStringManager->newDisplayString();
+			if (s_dockStrings[i])
+			{
+				s_dockStrings[i]->setFont(dockFont);
+				UnicodeString uStr;
+				uStr.translate(s_dockButtons[i].label);
+				s_dockStrings[i]->setText(uStr);
+			}
+		}
+	}
+
+	const int activeCount = s_dockExpanded ? s_numDockButtons : 1;
+
+	// Draw toggle icon label change based on expanded state
+	if (s_dockStrings[0])
+	{
+		UnicodeString toggleStr;
+		toggleStr.translate(s_dockExpanded ? "[-]" : "[+]");
+		s_dockStrings[0]->setText(toggleStr);
+	}
+
+	for (int i = 0; i < activeCount; ++i)
+	{
+		const Int bx = startX;
+		const Int by = startY + i * (btnH + spacing);
+
+		const bool isHighlighted = (s_highlightedButton == i);
+
+		// Background: dark glass tile
+		Color bgColor = isHighlighted ? GameMakeColor(45, 110, 190, 220) : GameMakeColor(20, 25, 35, 190);
+		TheDisplay->drawFillRect(bx, by, btnW, btnH, bgColor);
+
+		// Border: subtle blue neon
+		Color borderColor = isHighlighted ? GameMakeColor(120, 200, 255, 255) : GameMakeColor(70, 130, 200, 210);
+		TheDisplay->drawRect(bx, by, btnW, btnH, 1, borderColor);
+
+		// Centered label text
+		if (s_dockStrings[i])
+		{
+			const Int textW = s_dockStrings[i]->getWidth();
+			const Int fontH = s_dockStrings[i]->getFont() ? s_dockStrings[i]->getFont()->height : 12;
+			const Int tx = bx + (btnW - textW) / 2;
+			const Int ty = by + (btnH - fontH) / 2;
+
+			Color textColor = isHighlighted ? GameMakeColor(255, 255, 120, 255) : GameMakeColor(255, 255, 255, 255);
+			Color dropColor = GameMakeColor(0, 0, 0, 255);
+			s_dockStrings[i]->draw(tx, ty, textColor, dropColor);
+		}
+	}
+}
+
+Bool InGameUI::handleMobileActionDockTouch(Int screenX, Int screenY, Bool isDown)
+{
+	if (!TheGameLogic || !TheGameLogic->isInGame() || TheGameLogic->isInShellGame())
+		return FALSE;
+
+	const Int btnW = 44;
+	const Int btnH = 32;
+	const Int spacing = 4;
+	const Int startX = getHudAnchorX() + 4;
+	const Int startY = 110;
+
+	const int activeCount = s_dockExpanded ? s_numDockButtons : 1;
+
+	for (int i = 0; i < activeCount; ++i)
+	{
+		const Int bx = startX;
+		const Int by = startY + i * (btnH + spacing);
+
+		if (screenX >= bx && screenX <= (bx + btnW) &&
+		    screenY >= by && screenY <= (by + btnH))
+		{
+			if (isDown)
+			{
+				s_highlightedButton = i;
+				s_buttonDownTime = timeGetTime();
+			}
+			else
+			{
+				s_highlightedButton = -1;
+				const UnsignedInt holdMs = timeGetTime() - s_buttonDownTime;
+
+				switch (s_dockButtons[i].actionType)
+				{
+					case 0: // Toggle expand/collapse
+						s_dockExpanded = !s_dockExpanded;
+						break;
+					case 1: // Select All Combat Units
+						TheMessageStream->appendMessage(GameMessage::MSG_META_SELECT_ALL);
+						break;
+					case 2: // Stop
+						TheMessageStream->appendMessage(GameMessage::MSG_META_STOP);
+						break;
+					case 3: // Scatter
+						TheMessageStream->appendMessage(GameMessage::MSG_META_SCATTER);
+						break;
+					case 4: // Radar event / Jump to attack
+						TheMessageStream->appendMessage(GameMessage::MSG_META_VIEW_LAST_RADAR_EVENT);
+						break;
+					case 5: // Command Center / Home
+						TheMessageStream->appendMessage(GameMessage::MSG_META_VIEW_COMMAND_CENTER);
+						break;
+					case 6: // Control Group 1
+					case 7: // Control Group 2
+					case 8: // Control Group 3
+					case 9: // Control Group 4
+					{
+						const Int groupIdx = s_dockButtons[i].actionType - 6;
+						if (holdMs >= 350) {
+							// Long press: Assign selected units to group
+							TheMessageStream->appendMessage((GameMessage::Type)(GameMessage::MSG_META_CREATE_TEAM1 + groupIdx));
+						} else {
+							// Tap: Select group
+							TheMessageStream->appendMessage((GameMessage::Type)(GameMessage::MSG_META_SELECT_TEAM1 + groupIdx));
+						}
+						break;
+					}
+				}
+			}
+			return TRUE; // Consumed by Mobile Action Dock
+		}
+	}
+
+	if (!isDown) {
+		s_highlightedButton = -1;
+	}
+	return FALSE;
+}
+#endif

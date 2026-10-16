@@ -475,7 +475,8 @@ int main(int argc, char* argv[])
 		// GeneralsX @feature msudario 10/10/2026 Dim home indicator and defer system gestures so bottom Control Bar taps don't exit the app
 		SDL_SetHint(SDL_HINT_IOS_HIDE_HOME_INDICATOR, "2");
 #endif
-		if (!SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
+		// GeneralsX @feature msudario 17/10/2026 Enable Gamepad subsystem for physical controllers (Backbone One, Xbox, DualSense)
+		if (!SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD)) {
 			fprintf(stderr, "FATAL: Failed to initialize SDL3: %s\n", SDL_GetError());
 			return 1;
 		}

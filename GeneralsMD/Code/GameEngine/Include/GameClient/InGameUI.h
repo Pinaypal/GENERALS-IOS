@@ -598,6 +598,14 @@ private:
 	void drawSystemTime(Int &x, Int &y);
 	void drawGameTime();
 	void drawPlayerInfoList();
+#if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
+	void drawMobileActionDock();
+	Bool handleMobileActionDockTouch(Int screenX, Int screenY, Bool isDown);
+#else
+	void drawMobileActionDock() {}
+	Bool handleMobileActionDockTouch(Int, Int, Bool) { return FALSE; }
+#endif
+
 
 public:
 	void registerWindowLayout(WindowLayout *layout); // register a layout for updates
